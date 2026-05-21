@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Datasets et checkpoints lourds
+data/voc_sample/
+results/**/weights/
+results/**/*.pt
+*.cache
+
+# Sorties d'entraînement Ultralytics non versionnées
+results/**/events.out.tfevents*
+results/**/labels/
+results/**/plots/
+
+# OS
+.DS_Store

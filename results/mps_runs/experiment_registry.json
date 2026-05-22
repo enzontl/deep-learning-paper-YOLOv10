@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-05-21T18:41:21",
+  "created_at": "2026-05-22T19:40:33",
   "root": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10",
   "results_dir": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs",
   "analysis_dir": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/analysis",
@@ -10,123 +10,24 @@
   "config": {
     "imgsz": 416,
     "batch": 8,
-    "lr0": 0.003,
-    "lrf": 0.1,
-    "warmup_epochs": 1.0,
+    "lr0": 0.005,
+    "lrf": 0.001,
+    "warmup_epochs": 3.0,
+    "momentum": 0.937,
     "weight_decay": 0.0005,
-    "optimizer": "Adam",
-    "workers": 0,
-    "run_tag": "mps_adam"
+    "optimizer": "SGD",
+    "workers": 6,
+    "run_tag": "mps_sgd_safe"
   },
   "regimes": {
-    "A": {
-      "epochs": 20,
-      "fraction": 0.15
-    },
-    "B": {
-      "epochs": 35,
-      "fraction": 0.08
+    "main": {
+      "epochs": 40,
+      "fraction": 0.1
     }
   },
   "runs": {
-    "v10_A": {
-      "run_name": "yolov10n_A_mps_adam",
-      "model_key": "v10",
-      "source_weights": "yolov10n.pt",
-      "regime": "A",
-      "epochs": 20,
-      "fraction": 0.15,
-      "device": "mps",
-      "optimizer": "Adam",
-      "lr0": 0.003,
-      "lrf": 0.1,
-      "imgsz": 416,
-      "batch": 8,
-      "best": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_A_mps_adam/weights/best.pt",
-      "last": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_A_mps_adam/weights/last.pt",
-      "results_csv": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_A_mps_adam/results.csv",
-      "metrics_from_csv": {
-        "epoch": 20.0,
-        "metrics/precision(B)": 0.31744,
-        "metrics/recall(B)": 0.32402,
-        "metrics/mAP50(B)": 0.25508,
-        "metrics/mAP50-95(B)": 0.15477
-      }
-    },
-    "v8_A": {
-      "run_name": "yolov8n_A_mps_adam",
-      "model_key": "v8",
-      "source_weights": "yolov8n.pt",
-      "regime": "A",
-      "epochs": 20,
-      "fraction": 0.15,
-      "device": "mps",
-      "optimizer": "Adam",
-      "lr0": 0.003,
-      "lrf": 0.1,
-      "imgsz": 416,
-      "batch": 8,
-      "best": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_A_mps_adam/weights/best.pt",
-      "last": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_A_mps_adam/weights/last.pt",
-      "results_csv": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_A_mps_adam/results.csv",
-      "metrics_from_csv": {
-        "epoch": 20.0,
-        "metrics/precision(B)": 0.46207,
-        "metrics/recall(B)": 0.46422,
-        "metrics/mAP50(B)": 0.42921,
-        "metrics/mAP50-95(B)": 0.27073
-      }
-    },
-    "v10_B": {
-      "run_name": "yolov10n_B_mps_adam",
-      "model_key": "v10",
-      "source_weights": "yolov10n.pt",
-      "regime": "B",
-      "epochs": 35,
-      "fraction": 0.08,
-      "device": "mps",
-      "optimizer": "Adam",
-      "lr0": 0.003,
-      "lrf": 0.1,
-      "imgsz": 416,
-      "batch": 8,
-      "best": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_B_mps_adam/weights/best.pt",
-      "last": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_B_mps_adam/weights/last.pt",
-      "results_csv": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_B_mps_adam/results.csv",
-      "metrics_from_csv": {
-        "epoch": 35.0,
-        "metrics/precision(B)": 0.30079,
-        "metrics/recall(B)": 0.30612,
-        "metrics/mAP50(B)": 0.23733,
-        "metrics/mAP50-95(B)": 0.13907
-      }
-    },
-    "v8_B": {
-      "run_name": "yolov8n_B_mps_adam",
-      "model_key": "v8",
-      "source_weights": "yolov8n.pt",
-      "regime": "B",
-      "epochs": 35,
-      "fraction": 0.08,
-      "device": "mps",
-      "optimizer": "Adam",
-      "lr0": 0.003,
-      "lrf": 0.1,
-      "imgsz": 416,
-      "batch": 8,
-      "best": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_B_mps_adam/weights/best.pt",
-      "last": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_B_mps_adam/weights/last.pt",
-      "results_csv": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_B_mps_adam/results.csv",
-      "metrics_from_csv": {
-        "epoch": 35.0,
-        "metrics/precision(B)": 0.40534,
-        "metrics/recall(B)": 0.4233,
-        "metrics/mAP50(B)": 0.37867,
-        "metrics/mAP50-95(B)": 0.23123
-      }
-    },
     "v10_main": {
-      "run_name": "yolov10n_main_mps_sgd_main",
+      "run_name": "yolov10n_main_mps_sgd_safe",
       "model_key": "v10",
       "source_weights": "yolov10n.pt",
       "regime": "main",
@@ -137,16 +38,40 @@
       "lr0": 0.005,
       "lrf": 0.001,
       "imgsz": 416,
-      "batch": 16,
-      "best": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_main_mps_sgd_main/weights/best.pt",
-      "last": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_main_mps_sgd_main/weights/last.pt",
-      "results_csv": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_main_mps_sgd_main/results.csv",
+      "batch": 8,
+      "best": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_main_mps_sgd_safe/weights/best.pt",
+      "last": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_main_mps_sgd_safe/weights/last.pt",
+      "results_csv": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov10n_main_mps_sgd_safe/results.csv",
       "metrics_from_csv": {
         "epoch": 40.0,
-        "metrics/precision(B)": 0.61634,
-        "metrics/recall(B)": 0.54216,
-        "metrics/mAP50(B)": 0.57309,
-        "metrics/mAP50-95(B)": 0.39616
+        "metrics/precision(B)": 0.61875,
+        "metrics/recall(B)": 0.52298,
+        "metrics/mAP50(B)": 0.56387,
+        "metrics/mAP50-95(B)": 0.39069
+      }
+    },
+    "v8_main": {
+      "run_name": "yolov8n_main_mps_sgd_safe",
+      "model_key": "v8",
+      "source_weights": "yolov8n.pt",
+      "regime": "main",
+      "epochs": 40,
+      "fraction": 0.1,
+      "device": "mps",
+      "optimizer": "SGD",
+      "lr0": 0.005,
+      "lrf": 0.001,
+      "imgsz": 416,
+      "batch": 8,
+      "best": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_main_mps_sgd_safe/weights/best.pt",
+      "last": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_main_mps_sgd_safe/weights/last.pt",
+      "results_csv": "/Users/guillaumerabeau/deep-learning-paper-YOLOv10/results/mps_runs/yolov8n_main_mps_sgd_safe/results.csv",
+      "metrics_from_csv": {
+        "epoch": 40.0,
+        "metrics/precision(B)": 0.70658,
+        "metrics/recall(B)": 0.63817,
+        "metrics/mAP50(B)": 0.68007,
+        "metrics/mAP50-95(B)": 0.46503
       }
     }
   }

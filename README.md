@@ -1,130 +1,101 @@
-# YOLOv10 Reproducibility Study
+# YOLOv10 Reduced Reproduction
 
-Reproduction réduite du papier *YOLOv10: Real-Time End-to-End Object Detection*
-(Wang et al., 2024, [arXiv:2405.14458](https://arxiv.org/abs/2405.14458))
-adaptée à un **Mac Mini Apple Silicon**.
+This repository contains a lightweight reproduction of *YOLOv10: Real-Time End-to-End Object Detection* on **Pascal VOC**, adapted for a **Mac Mini / Apple Silicon** workflow.
 
-## Angle de reproduction
+The project is intentionally simple:
 
-L'idée centrale conservée est la suivante : comparer un modèle YOLOv10
-NMS-free à une baseline simple de même taille (`YOLOv8n`) dans un cadre plus
-léger que le papier original.
+- training is done from a notebook
+- comparison and analysis are done from a second notebook
+- heavy artifacts such as datasets, checkpoints, and figures stay outside Git
 
-Comme votre projet doit rester faisable localement, on garde une vraie tâche
-de détection mais on réduit le coût de calcul :
+## Goal
 
-- dataset : **Pascal VOC**, mais entraînement sur une **fraction déterministe**
-  du train set ;
-- budget raisonnable : **environ 40 epochs** ;
-- optimisation rapprochée du papier : **SGD** ;
-- matériel : **`mps`** sur macOS, pas `cuda`.
+The main question is whether **YOLOv10 in its native end-to-end / NMS-free mode** remains competitive against a similarly sized **YOLOv8n** baseline in a reduced experimental setting.
 
-## Pourquoi garder VOC
+This is not meant to reproduce the full paper at COCO scale.  
+It is meant to:
 
-Dans la liste proposée (`CIFAR-10/100`, `STL-10`, `Oxford-IIIT Pet`,
-`Pascal VOC`, `Tiny-ImageNet`, `Fashion-MNIST`), **Pascal VOC est le seul
-dataset directement adapté à la détection d'objets**, donc le plus cohérent
-pour une reproduction de YOLOv10.
+- isolate the main idea of the paper
+- test it on a smaller setup
+- compare it to a clean baseline
+- analyze where it works or fails
 
-La réduction de complexité se fait donc en travaillant sur une **petite
-fraction de VOC** plutôt qu'en changeant de tâche.
+## Dataset Choice
 
-## Nouveau workflow notebook
+We keep **Pascal VOC** because it is the most relevant dataset in the allowed list for an object detection paper such as YOLOv10.
 
-Le dépôt contient maintenant deux notebooks pensés pour un usage local sur Mac :
+To keep the project feasible locally, the setup uses:
+
+- a reduced training fraction
+- a memory-safe configuration for Apple Silicon
+- a moderate number of epochs
+
+## Notebooks
+
+The repository is organized around two notebooks:
 
 - [01_train_yolov10_mps.ipynb](/Users/guillaumerabeau/deep-learning-paper-YOLOv10/notebooks/01_train_yolov10_mps.ipynb)
 - [02_viz_compare_yolov10_mps.ipynb](/Users/guillaumerabeau/deep-learning-paper-YOLOv10/notebooks/02_viz_compare_yolov10_mps.ipynb)
 
-Le premier notebook :
+### 1. Training notebook
 
-- détecte `mps` automatiquement ;
-- bascule sur `cpu` si `mps` n'est pas disponible ;
-- entraîne `yolov10n.pt` et `yolov8n.pt` ;
-- utilise **SGD** ;
-- applique une **cosine decay** avec un LR initial plus élevé puis plus faible
-  en fin d'entraînement ;
-- sauvegarde `best.pt`, `last.pt`, `results.csv` et un registre JSON dans `results/mps_runs/`.
+The training notebook:
 
-Le second notebook recharge ensuite ces runs pour produire les comparaisons,
-les courbes et les visualisations.
+- uses `mps` when available
+- uses a conservative memory-safe setup
+- trains `YOLOv10n` and `YOLOv8n`
+- stores `best.pt`, `last.pt`, and `results.csv`
 
-## Lancement recommandé
+Current default training setup:
 
-Installer les dépendances :
+- `imgsz = 384`
+- `batch = 4`
+- `epochs = 40`
+- `fraction = 0.10`
+- `optimizer = SGD`
+- `device = mps`
+- `workers = 0`
+- `plots = False`
+
+### 2. Visualization notebook
+
+The visualization notebook reads the two run folders directly and produces:
+
+- learning curves
+- final metrics
+- end-to-end vs forced-NMS ablation
+- local latency comparison
+- efficiency summary table
+- detection count distribution
+- per-class comparison
+- qualitative examples
+
+## Recommended Usage
+
+1. Install dependencies:
 
 ```bash
 python3 -m pip install -r requirements.txt
 ```
 
-Ordre recommandé :
+2. Open [01_train_yolov10_mps.ipynb](/Users/guillaumerabeau/deep-learning-paper-YOLOv10/notebooks/01_train_yolov10_mps.ipynb) and run all cells.
 
-1. Ouvrir `notebooks/01_train_yolov10_mps.ipynb`
-2. Faire **Run All**
-3. Ouvrir `notebooks/02_viz_compare_yolov10_mps.ipynb`
-4. Faire **Run All**
+3. Open [02_viz_compare_yolov10_mps.ipynb](/Users/guillaumerabeau/deep-learning-paper-YOLOv10/notebooks/02_viz_compare_yolov10_mps.ipynb) and run all cells.
 
-Réglages par défaut du notebook d'entraînement :
+## Main Experimental Logic
 
-- Régime principal : `fraction=0.20`, `epochs=40`
-- `imgsz=416`
-- `batch=8`
-- `optimizer=SGD`
-- `lr0=0.01`
-- `lrf=0.01`
-- `device=mps`
+The most important comparison is:
 
-## Script optionnel
+- `YOLOv10 end2end`: the native NMS-free inference behavior
+- `YOLOv10 NMS forced`: the same checkpoint evaluated with a more classical post-processing path
+- `YOLOv8n`: the baseline
 
-Le script suivant reste disponible si vous voulez lancer l'entraînement hors notebook :
+This makes it possible to separate two questions:
 
-- [scripts/train_yolov10_mps.py](/Users/guillaumerabeau/deep-learning-paper-YOLOv10/scripts/train_yolov10_mps.py)
+1. Is YOLOv10 better than a standard baseline?
+2. Is the NMS-free branch itself strong enough in this reduced setting?
 
-Exemple :
-
-```bash
-python3 scripts/train_yolov10_mps.py --epochs 40 --fraction 0.20 --batch 8 --imgsz 416
-```
-
-Si la mémoire est trop juste sur votre machine :
-
-```bash
-python3 scripts/train_yolov10_mps.py --epochs 30 --fraction 0.15 --batch 4 --imgsz 416
-```
-
-## Réglages choisis
-
-Le notebook et le script utilisent les mêmes principes :
-
-- `device=mps`
-- `optimizer=SGD`
-- `epochs=40`
-- `fraction=0.20`
-- `imgsz=416`
-- `batch=8`
-- `lr0=0.01`
-- `lrf=0.01`
-- `cos_lr=True`
-- `workers=0`
-- `amp=False`
-
-Ce choix est volontairement conservateur pour la stabilité sur macOS.
-
-## Proposition d'expérience pour le rapport
-
-Vous pouvez structurer la reproduction ainsi :
-
-- **Ce qui est reproduit** : comparaison d'un YOLOv10 NMS-free contre une
-  baseline YOLOv8n sur une tâche de détection.
-- **Ce qui est simplifié** : petit modèle (`n`), fine-tuning court,
-  fraction de VOC, matériel local MPS.
-- **Baseline** : `YOLOv8n`.
-- **Changement par rapport au papier** : matériel `MPS`, dataset plus petit et
-  budget réduit.
-- **Ablation simple** : comparer `YOLOv10 end2end` à `YOLOv10 NMS forcée`, ou
-  faire varier `epochs` (30 vs 50) / `fraction` (0.15 vs 0.20).
-
-## Structure
+## Repository Structure
 
 ```text
 .
@@ -132,20 +103,16 @@ Vous pouvez structurer la reproduction ainsi :
 │   ├── 01_train_yolov10_mps.ipynb
 │   ├── 02_viz_compare_yolov10_mps.ipynb
 │   └── yolov10_reproduction.ipynb
-├── scripts/
-│   ├── generate_mps_notebooks.py
-│   └── train_yolov10_mps.py
 ├── data/
 ├── results/
 ├── tasks/
 ├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
-## Limites
+## Notes
 
-- Le dataset complet VOC est quand même téléchargé par Ultralytics.
-- Ce n'est pas une reproduction exhaustive du papier, mais une reproduction
-  réduite et rigoureuse.
-- Les résultats dépendront beaucoup du budget mémoire et du temps
-  d'entraînement disponibles sur votre Mac Mini.
+- Large files in `data/` and `results/` are intentionally ignored by Git.
+- The repository keeps only the code and notebooks needed to reproduce the analysis.
+- The final discussion should focus first on `mAP50-95`, then on the end-to-end vs forced-NMS ablation, then on latency and qualitative behavior.

@@ -13,32 +13,18 @@
   ],
   "runs": [
     {
-      "run_key": "v10_A",
+      "run_key": "v10_main",
       "modèle": "YOLOv10n",
-      "régime": "A",
-      "best_mb": 5.454950332641602,
-      "last_mb": 5.454950332641602
+      "régime": "principal",
+      "best_mb": 5.457452774047852,
+      "last_mb": 5.457452774047852
     },
     {
-      "run_key": "v8_A",
+      "run_key": "v8_main",
       "modèle": "YOLOv8n",
-      "régime": "A",
-      "best_mb": 5.922647476196289,
-      "last_mb": 5.922647476196289
-    },
-    {
-      "run_key": "v10_B",
-      "modèle": "YOLOv10n",
-      "régime": "B",
-      "best_mb": 5.456781387329102,
-      "last_mb": 5.456781387329102
-    },
-    {
-      "run_key": "v8_B",
-      "modèle": "YOLOv8n",
-      "régime": "B",
-      "best_mb": 5.924478530883789,
-      "last_mb": 5.924478530883789
+      "régime": "principal",
+      "best_mb": 5.925088882446289,
+      "last_mb": 5.925088882446289
     }
   ]
 }

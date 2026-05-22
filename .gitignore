@@ -1,21 +1,33 @@
+# OS
+.DS_Store
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.python-version
 .ipynb_checkpoints/
+
+# Environnements locaux
 .venv/
 venv/
+.venv-yolo/
 
-# Datasets et checkpoints lourds
-data/voc_sample/
-results/**/weights/
-results/**/*.pt
+# Donnees et artefacts lourds
+data/
+results/
+
+# Poids et checkpoints telecharges localement
+*.pt
+*.pth
+*.ckpt
+
+# Caches et sorties temporaires
 *.cache
+*.log
 
-# Sorties d'entraînement Ultralytics non versionnées
-results/**/events.out.tfevents*
-results/**/labels/
-results/**/plots/
-
-# OS
-.DS_Store
+# Artefacts Jupyter/visualisation non utiles au repo
+*.png
+*.jpg
+*.jpeg

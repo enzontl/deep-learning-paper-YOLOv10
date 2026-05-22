@@ -2,90 +2,150 @@
 
 Reproduction réduite du papier *YOLOv10: Real-Time End-to-End Object Detection*
 (Wang et al., 2024, [arXiv:2405.14458](https://arxiv.org/abs/2405.14458))
-dans le cadre du cours d'introduction au Deep Learning
-(Albert School x Mines Paris PSL).
+adaptée à un **Mac Mini Apple Silicon**.
 
 ## Angle de reproduction
 
-Idée centrale étudiée : la suppression de la NMS à l'inférence, obtenue par
-l'assignation duale (one-to-many + one-to-one) et la métrique de matching
-cohérente.
+L'idée centrale conservée est la suivante : comparer un modèle YOLOv10
+NMS-free à une baseline simple de même taille (`YOLOv8n`) dans un cadre plus
+léger que le papier original.
 
-Question expérimentale : la branche one-to-one suffit-elle à produire des
-détections sans doublons sur un dataset plus simple que COCO, et à quel
-coût en précision ?
+Comme votre projet doit rester faisable localement, on garde une vraie tâche
+de détection mais on réduit le coût de calcul :
 
-## Méthode B : compute-parity entre deux régimes
+- dataset : **Pascal VOC**, mais entraînement sur une **fraction déterministe**
+  du train set ;
+- budget raisonnable : **environ 40 epochs** ;
+- optimisation rapprochée du papier : **SGD** ;
+- matériel : **`mps`** sur macOS, pas `cuda`.
 
-La one-to-one head reçoit un seul positif par objet par epoch, contre N pour
-la one-to-many. Elle pourrait demander plus de passages par objet pour
-converger. On teste sous deux régimes équivalents en nombre de vues d'images
-total :
+## Pourquoi garder VOC
 
-- **Régime A** : 30% de VOC 2007+2012 (~5000 images), 10 epochs.
-- **Régime B** : 10% de VOC 2007+2012 (~1655 images), 30 epochs.
+Dans la liste proposée (`CIFAR-10/100`, `STL-10`, `Oxford-IIIT Pet`,
+`Pascal VOC`, `Tiny-ImageNet`, `Fashion-MNIST`), **Pascal VOC est le seul
+dataset directement adapté à la détection d'objets**, donc le plus cohérent
+pour une reproduction de YOLOv10.
 
-Compute identique (~50000 vues), mais en B chaque ground truth est vu 30
-fois au lieu de 10 (ratio 3x). Permet de tester si la one-to-one souffrait
-de sous-entraînement.
+La réduction de complexité se fait donc en travaillant sur une **petite
+fraction de VOC** plutôt qu'en changeant de tâche.
 
-Optimisé T4 : imgsz=416, batch=32, cache RAM. Notebook complet en ~15 min.
+## Nouveau workflow notebook
+
+Le dépôt contient maintenant deux notebooks pensés pour un usage local sur Mac :
+
+- [01_train_yolov10_mps.ipynb](/Users/guillaumerabeau/deep-learning-paper-YOLOv10/notebooks/01_train_yolov10_mps.ipynb)
+- [02_viz_compare_yolov10_mps.ipynb](/Users/guillaumerabeau/deep-learning-paper-YOLOv10/notebooks/02_viz_compare_yolov10_mps.ipynb)
+
+Le premier notebook :
+
+- détecte `mps` automatiquement ;
+- bascule sur `cpu` si `mps` n'est pas disponible ;
+- entraîne `yolov10n.pt` et `yolov8n.pt` ;
+- utilise **SGD** ;
+- applique une **cosine decay** avec un LR initial plus élevé puis plus faible
+  en fin d'entraînement ;
+- sauvegarde `best.pt`, `last.pt`, `results.csv` et un registre JSON dans `results/mps_runs/`.
+
+Le second notebook recharge ensuite ces runs pour produire les comparaisons,
+les courbes et les visualisations.
+
+## Lancement recommandé
+
+Installer les dépendances :
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+Ordre recommandé :
+
+1. Ouvrir `notebooks/01_train_yolov10_mps.ipynb`
+2. Faire **Run All**
+3. Ouvrir `notebooks/02_viz_compare_yolov10_mps.ipynb`
+4. Faire **Run All**
+
+Réglages par défaut du notebook d'entraînement :
+
+- Régime principal : `fraction=0.20`, `epochs=40`
+- `imgsz=416`
+- `batch=8`
+- `optimizer=SGD`
+- `lr0=0.01`
+- `lrf=0.01`
+- `device=mps`
+
+## Script optionnel
+
+Le script suivant reste disponible si vous voulez lancer l'entraînement hors notebook :
+
+- [scripts/train_yolov10_mps.py](/Users/guillaumerabeau/deep-learning-paper-YOLOv10/scripts/train_yolov10_mps.py)
+
+Exemple :
+
+```bash
+python3 scripts/train_yolov10_mps.py --epochs 40 --fraction 0.20 --batch 8 --imgsz 416
+```
+
+Si la mémoire est trop juste sur votre machine :
+
+```bash
+python3 scripts/train_yolov10_mps.py --epochs 30 --fraction 0.15 --batch 4 --imgsz 416
+```
+
+## Réglages choisis
+
+Le notebook et le script utilisent les mêmes principes :
+
+- `device=mps`
+- `optimizer=SGD`
+- `epochs=40`
+- `fraction=0.20`
+- `imgsz=416`
+- `batch=8`
+- `lr0=0.01`
+- `lrf=0.01`
+- `cos_lr=True`
+- `workers=0`
+- `amp=False`
+
+Ce choix est volontairement conservateur pour la stabilité sur macOS.
+
+## Proposition d'expérience pour le rapport
+
+Vous pouvez structurer la reproduction ainsi :
+
+- **Ce qui est reproduit** : comparaison d'un YOLOv10 NMS-free contre une
+  baseline YOLOv8n sur une tâche de détection.
+- **Ce qui est simplifié** : petit modèle (`n`), fine-tuning court,
+  fraction de VOC, matériel local MPS.
+- **Baseline** : `YOLOv8n`.
+- **Changement par rapport au papier** : matériel `MPS`, dataset plus petit et
+  budget réduit.
+- **Ablation simple** : comparer `YOLOv10 end2end` à `YOLOv10 NMS forcée`, ou
+  faire varier `epochs` (30 vs 50) / `fraction` (0.15 vs 0.20).
 
 ## Structure
 
-```
+```text
 .
 ├── notebooks/
-│   └── yolov10_reproduction.ipynb   # tout le code et toutes les expériences
-├── data/                            # échantillon d'images pour latence et qualitatif
-├── results/                         # checkpoints, JSON, figures
+│   ├── 01_train_yolov10_mps.ipynb
+│   ├── 02_viz_compare_yolov10_mps.ipynb
+│   └── yolov10_reproduction.ipynb
+├── scripts/
+│   ├── generate_mps_notebooks.py
+│   └── train_yolov10_mps.py
+├── data/
+├── results/
 ├── tasks/
-│   ├── todo.md
-│   └── lessons.md
 ├── requirements.txt
-├── CLAUDE.md
 └── README.md
 ```
 
-Pas de scripts externes. Le notebook est self-contained : toutes les
-fonctions (training, évaluation, ablation, latence, visualisations) sont
-définies en cellules.
-
-## Utilisation sur Colab (recommandé)
-
-1. Copier le dossier sur Google Drive.
-2. Ouvrir `notebooks/yolov10_reproduction.ipynb` depuis Drive.
-3. Runtime > Change runtime type > GPU (T4 minimum).
-4. Adapter `PROJECT_DIR` dans la cellule de configuration si besoin.
-5. Run all.
-
-Le dataset VOC (~2.8 Go) est placé sur le disque local Colab
-(`/content/datasets`, volatil) pour ne pas saturer Drive. Checkpoints, JSON
-et figures restent sur Drive. Le dataset est retéléchargé à chaque session
-(~3 min).
-
-## Budget de calcul
-
-Sur T4 (Colab gratuit) avec les réglages par défaut du notebook (imgsz=416,
-batch=32, cache RAM, sous-échantillonnage VOC) :
-
-- 4 entraînements : ~2 min chacun = ~8 min
-- Évaluation finale + ablation (~30 evals) : ~3 min
-- Latence + figures + qualitatif : ~2 min
-- Total notebook : **~15 min**
-
-Le notebook saute toute étape déjà cachée (`best.pt`, JSON existants), donc
-on peut interrompre et reprendre sans rejouer ce qui est fini.
-
-## Reproductibilité
-
-- `seed=42` partout (torch, numpy, random, cudnn deterministic).
-- Hyperparamètres d'entraînement fixés dans `train_if_needed` dans le
-  notebook.
-- Chaque étape sérialise ses résultats en JSON dans `results/`.
-
 ## Limites
 
-Détaillées en section 11 du notebook. En résumé : fine-tuning court depuis
-COCO, VOC moins dense que COCO, latence PyTorch et pas TensorRT, un seul
-seed.
+- Le dataset complet VOC est quand même téléchargé par Ultralytics.
+- Ce n'est pas une reproduction exhaustive du papier, mais une reproduction
+  réduite et rigoureuse.
+- Les résultats dépendront beaucoup du budget mémoire et du temps
+  d'entraînement disponibles sur votre Mac Mini.

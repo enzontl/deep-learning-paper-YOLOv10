@@ -1,0 +1,427 @@
+% ===========================================================================
+%  Project Report — Introduction to Deep Learning
+%  YOLOv10: Real-Time End-to-End Object Detection without NMS
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+
+% ── Packages ───────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{array}
+\usepackage{tabularx}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, citecolor=blue!60!black, urlcolor=blue!60!black}
+
+% ── Figure path ───────────────────────────────────────────────────────────
+\graphicspath{{figures/}}
+
+% ── Title ─────────────────────────────────────────────────────────────────
+\title{
+  \textbf{Simplified Reproduction of YOLOv10}\\[4pt]
+  \large End-to-End Object Detection without NMS on Pascal~VOC\\[8pt]
+  \normalsize Validation Project --- Introduction to Deep Learning
+}
+\author{
+  Guillaume Rabeau \and Enzo Natali \and Jonathan Bouniol \and Anna Spira
+}
+\date{May 2026}
+
+% ===========================================================================
+\begin{document}
+\maketitle
+
+% ── Table of contents ─────────────────────────────────────────────────────
+\tableofcontents
+\newpage
+
+% ===========================================================================
+\section{Introduction}
+% ===========================================================================
+
+The YOLO family of detectors has been the dominant paradigm in real-time object detection for several years, thanks to an effective trade-off between computational cost and detection performance.
+However, all models from YOLOv1 through YOLOv9 rely on \emph{Non-Maximum Suppression} (NMS) as a post-processing step to filter redundant predictions, which adds non-negligible latency and makes performance sensitive to NMS hyperparameters.
+
+The \textbf{YOLOv10} paper~\cite{wang2024yolov10}, presented at NeurIPS~2024, proposes two main contributions to address this issue:
+\begin{enumerate}[noitemsep]
+  \item \textbf{Consistent dual label assignments}: training with a \emph{one-to-many} head (rich supervision) and a \emph{one-to-one} head (NMS-free inference), linked by a consistent matching metric.
+  \item \textbf{Efficiency-driven architectural design}: compact inverted blocks (CIB), rank-guided block allocation, partial self-attention (PSA), and large-kernel convolutions to improve the accuracy-efficiency trade-off.
+\end{enumerate}
+
+\paragraph{Project objective.}
+We reproduce the paper's conclusions in a simplified setting: training the \texttt{Nano} variants of YOLOv10 and YOLOv8 (baseline) on a subset of Pascal~VOC, with comparative evaluation and an ablation study on the end-to-end vs.\ NMS mechanism.
+
+% ===========================================================================
+\section{Method}
+% ===========================================================================
+
+\subsection{YOLOv10 Architecture}
+
+YOLOv10 retains the classic backbone--neck--head architecture of the YOLO family but introduces several key modifications:
+
+\paragraph{Dual label assignments.}
+During training, two detection heads operate in parallel:
+\begin{itemize}[noitemsep]
+  \item The \emph{one-to-many} (o2m) head assigns multiple positive predictions to each object, providing a rich supervision signal.
+  \item The \emph{one-to-one} (o2o) head assigns only one prediction per object, enabling direct inference without NMS.
+\end{itemize}
+Both branches share the same backbone and neck. At inference time, only the o2o head is used, eliminating all post-processing.
+
+\paragraph{Consistent matching metric.}
+To align the supervision of both heads, a unified metric is used:
+\begin{equation}
+  m(\alpha, \beta) = s \cdot p^{\alpha} \cdot \text{IoU}(\hat{b}, b)^{\beta}
+  \label{eq:metric}
+\end{equation}
+where $p$ is the classification score, $\hat{b}$ and $b$ are the predicted and ground-truth bounding boxes, $s$ is the spatial prior, and $\alpha, \beta$ control the balance between semantic prediction and localization quality. The paper shows that using the same $\alpha, \beta$ for both heads improves assignment alignment.
+
+\paragraph{Compact Inverted Block (CIB).}
+The CIB replaces standard residual blocks in stages with low intrinsic rank. It uses \emph{depthwise} convolutions for spatial mixing and $1\!\times\!1$ pointwise convolutions for channel mixing, significantly reducing the parameter count.
+
+\paragraph{Partial Self-Attention (PSA).}
+A partial self-attention module is added after the CIB layers: only a fraction of the channels passes through the multi-head attention mechanism, while the rest is simply concatenated. This captures global dependencies without the full quadratic cost.
+
+\subsection{Differences with the YOLOv8 Baseline}
+
+YOLOv8 uses a C2f architecture (Cross Stage Partial with two convolutions) and relies entirely on \emph{one-to-many} training with NMS at inference. Table~\ref{tab:archi_diff} summarizes the main differences.
+
+\begin{table}[H]
+\centering
+\caption{Architectural comparison between YOLOv8n and YOLOv10n.}
+\label{tab:archi_diff}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Component} & \textbf{YOLOv8n} & \textbf{YOLOv10n} \\
+\midrule
+Parameters (M)        & 3.01  & 2.71  \\
+Post-processing       & NMS   & End-to-end (NMS-free) \\
+Training assignment   & One-to-many & Dual (o2m + o2o) \\
+Basic block           & C2f / Bottleneck & CIB (rank-guided) \\
+Attention             & --- & Partial self-attention \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ===========================================================================
+\section{Reproduction Setup}
+% ===========================================================================
+
+\subsection{Dataset and Preprocessing}
+
+We use the \textbf{Pascal~VOC} dataset (20 object classes) via the \texttt{VOC.yaml} configuration provided by Ultralytics. To comply with hardware constraints, we use only \textbf{10\,\%} of the training data (\texttt{fraction=0.1}), i.e., approximately 1,640 images out of the 16,400 available. Evaluation is performed on the full VOC~2007 test set.
+
+Images are resized to $416\!\times\!416$ pixels (instead of $640\!\times\!640$ in the original paper) to speed up training. Standard augmentations are retained: mosaic, horizontal flip, HSV adjustments, and \texttt{erasing=0.4}.
+
+\subsection{Training Protocol}
+
+Both models are trained with identical hyperparameters to ensure a fair comparison:
+
+\begin{table}[H]
+\centering
+\caption{Training hyperparameters common to both models.}
+\label{tab:hyperparams}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Epochs               & 40 \\
+Batch size           & 8 \\
+Image size           & $416\!\times\!416$ \\
+Optimizer            & SGD (lr$_0$=0.005, momentum=0.937) \\
+Scheduler            & Cosine annealing (lr$_f$=0.001) \\
+Weight decay         & $5\!\times\!10^{-4}$ \\
+Warmup               & 3 epochs \\
+Close mosaic         & Last 10 epochs \\
+Pretrained           & Yes (COCO) \\
+Seed                 & 42 \\
+Device               & Apple MPS (Mac Mini M2) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Metrics}
+
+We report the standard object detection metrics:
+\begin{itemize}[noitemsep]
+  \item \textbf{mAP@50}: mean average precision at an IoU threshold of 0.5.
+  \item \textbf{mAP@50:95}: mean over IoU thresholds from 0.5 to 0.95 with a step of 0.05 --- the primary metric, stricter and more representative of localization quality.
+  \item \textbf{Precision} and \textbf{Recall} at the optimal confidence threshold.
+  \item \textbf{Latency} (ms/image) measured locally on 100 images with warmup.
+\end{itemize}
+
+\subsection{Simplifications Compared to the Original Paper}
+
+\begin{itemize}[noitemsep]
+  \item \textbf{Dataset}: Pascal~VOC (20 classes, $\sim$1.6k training images) instead of COCO (80 classes, 118k images).
+  \item \textbf{Fraction}: only 10\,\% of the training data.
+  \item \textbf{Resolution}: $416\!\times\!416$ instead of $640\!\times\!640$.
+  \item \textbf{Epochs}: 40 instead of 500.
+  \item \textbf{Scale}: only the \texttt{Nano} variants (lightest models).
+  \item \textbf{Hardware}: Apple MPS instead of NVIDIA T4/A100 GPUs.
+  \item \textbf{AMP}: disabled (MPS incompatibility at the time of experiments).
+\end{itemize}
+
+% ===========================================================================
+\section{Results}
+% ===========================================================================
+
+\subsection{Learning Curves}
+
+Figure~\ref{fig:learning_curves} shows the evolution of mAP@50:95 on the validation set throughout training. YOLOv8n converges faster and maintains a consistent advantage over YOLOv10n across all 40~epochs. From epoch~5 onward, the gap stabilizes at approximately 7--8 mAP@50:95 points.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{learning_curves_best.png}
+  \caption{Learning curves --- validation mAP@50:95 over epochs.}
+  \label{fig:learning_curves}
+\end{figure}
+
+\subsection{Final Model Comparison}
+
+Table~\ref{tab:final_metrics} presents the evaluation results on the best checkpoint (\texttt{best.pt}) for each model.
+
+\begin{table}[H]
+\centering
+\caption{Final evaluation results on Pascal~VOC test2007.}
+\label{tab:final_metrics}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Model} & \textbf{mAP@50} & \textbf{mAP@50:95} & \textbf{Precision} & \textbf{Recall} \\
+\midrule
+YOLOv10n (end-to-end) & 0.559 & 0.387 & 0.612 & 0.522 \\
+YOLOv8n (NMS)         & 0.680 & 0.466 & 0.725 & 0.621 \\
+\midrule
+\textbf{Gap}          & \textbf{--0.121} & \textbf{--0.079} & \textbf{--0.113} & \textbf{--0.099} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+YOLOv8n outperforms YOLOv10n across all metrics. The 7.9-point gap in mAP@50:95 is significant and contrasts with the original paper's results, where YOLOv10-N surpasses YOLOv8-N by 1.2 points on COCO (38.5 vs.\ 37.3).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{final_metrics_best.png}
+  \caption{Final metric comparison between YOLOv10n and YOLOv8n.}
+  \label{fig:final_metrics}
+\end{figure}
+
+\subsection{Efficiency and Latency}
+
+Table~\ref{tab:efficiency} puts model size, local latency, and the paper's reference numbers in perspective.
+
+\begin{table}[H]
+\centering
+\caption{Efficiency comparison between both models.}
+\label{tab:efficiency}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Model} & \textbf{Params (M)} & \textbf{FLOPs (G)} & \textbf{mAP@50:95} & \textbf{Local latency (ms)} & \textbf{Checkpoint (MB)} \\
+\midrule
+YOLOv10n & 2.71 & 6.7 & 0.387 & 28.5 & 5.46 \\
+YOLOv8n  & 3.01 & 8.7 & 0.466 & 22.1 & 5.93 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Despite having 10\,\% fewer parameters and 23\,\% fewer FLOPs, YOLOv10n is \emph{slower} locally (28.5~ms vs.\ 22.1~ms). This is because YOLOv10-specific operators (PSA, CIB) are not optimized for Apple's MPS backend, unlike the standard C2f operations in YOLOv8 which benefit from mature support.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{efficiency_summary_best.png}
+  \caption{Efficiency summary: overview table and latency--accuracy trade-off.}
+  \label{fig:efficiency}
+\end{figure}
+
+\subsection{Per-Class Analysis}
+
+Figure~\ref{fig:per_class} details the mAP@50:95 for each of the 20 Pascal~VOC classes. The gap between the two models is \emph{systematic}: YOLOv8n dominates on every single class. The most affected classes are \texttt{bottle} ($\Delta$=--0.089), \texttt{cow} ($\Delta$=--0.119), and \texttt{tvmonitor} ($\Delta$=--0.083), while \texttt{car} and \texttt{cat} show the smallest gaps.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{per_class_best.png}
+  \caption{Per-class mAP@50:95 for YOLOv10n and YOLOv8n.}
+  \label{fig:per_class}
+\end{figure}
+
+\subsection{Qualitative Examples}
+
+Figure~\ref{fig:qualitative} shows visual predictions on validation images. YOLOv10n produces more parsimonious detections (fewer boxes per image), which is consistent with its end-to-end design, but misses certain objects that YOLOv8n detects correctly.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{qualitative_grid_best.png}
+  \caption{Detection examples on validation images (conf~$\geq$~0.25).}
+  \label{fig:qualitative}
+\end{figure}
+
+% ===========================================================================
+\section{Ablation: End-to-End vs.\ Forced NMS}
+% ===========================================================================
+
+\subsection{Motivation and Hypothesis}
+
+The main contribution of YOLOv10 is the elimination of NMS through the \emph{one-to-one} head. We test the following hypothesis: \emph{does end-to-end inference (without NMS) degrade performance compared to evaluation with forced NMS on the same checkpoint?}
+
+If so, this would confirm the original paper's observation: for small-capacity models (Nano), the o2o head fails to produce sufficiently discriminative features.
+
+\subsection{Protocol}
+
+We evaluate the \emph{same} YOLOv10n checkpoint (\texttt{best.pt}) under three configurations:
+\begin{enumerate}[noitemsep]
+  \item \textbf{YOLOv10 end-to-end}: native NMS-free inference (o2o head only).
+  \item \textbf{YOLOv10 forced NMS}: NMS post-processing is forced on YOLOv10's predictions.
+  \item \textbf{YOLOv8 (reference)}: baseline with standard NMS.
+\end{enumerate}
+
+\subsection{Ablation Results}
+
+\begin{table}[H]
+\centering
+\caption{Ablation: end-to-end vs.\ forced NMS on the YOLOv10n checkpoint.}
+\label{tab:ablation}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Configuration} & \textbf{mAP@50} & \textbf{mAP@50:95} & \textbf{Precision} & \textbf{Recall} \\
+\midrule
+YOLOv10 end-to-end  & 0.559 & 0.387 & 0.612 & 0.522 \\
+YOLOv10 forced NMS  & 0.665 & 0.452 & 0.697 & 0.618 \\
+YOLOv8 (reference)  & 0.680 & 0.466 & 0.725 & 0.621 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{ablation_best.png}
+  \caption{Ablation: mAP@50:95 by inference mode.}
+  \label{fig:ablation}
+\end{figure}
+
+\paragraph{Analysis.}
+Forcing NMS on the YOLOv10n checkpoint recovers \textbf{6.5 mAP@50:95 points} (0.387 $\to$ 0.452), closing most of the gap with YOLOv8n (0.466). This demonstrates that:
+
+\begin{enumerate}[noitemsep]
+  \item The backbone and neck of YOLOv10n have learned representations of comparable quality to those of YOLOv8n.
+  \item The performance loss in end-to-end mode stems primarily from the \emph{one-to-one} head, which is not sufficiently discriminative at this model scale.
+  \item This finding is \textbf{consistent with the original paper's analysis} (Section~5, Table~3), which acknowledges a 1.0\,\% AP gap for YOLOv10-N on COCO between end-to-end and NMS modes.
+\end{enumerate}
+
+The residual 1.4-point gap between YOLOv10 forced NMS and YOLOv8 can be explained by architectural differences (CIB vs.\ C2f) and the fact that our limited training conditions (40 epochs, 10\,\% of data) do not allow YOLOv10's innovations to fully compensate.
+
+\subsection{Detection Count Distribution}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{detection_counts_best.png}
+  \caption{Distribution of detections per image by configuration.}
+  \label{fig:detection_dist}
+\end{figure}
+
+Figure~\ref{fig:detection_dist} confirms that end-to-end mode produces \emph{fewer detections per image} (median $\approx$~1--2) than forced NMS (median $\approx$~2--3) or YOLOv8 (median $\approx$~2--3). This parsimonious behavior is expected by design: the o2o head selects at most one prediction per object, eliminating redundancies without post-processing.
+
+% ===========================================================================
+\section{Critical Discussion}
+% ===========================================================================
+
+\subsection{What Works}
+
+\begin{itemize}[noitemsep]
+  \item \textbf{The end-to-end vs.\ NMS ablation} qualitatively reproduces the paper's observations: NMS-free mode incurs a performance loss for small models, and forced NMS recovers most of this gap.
+  \item \textbf{The parsimonious behavior} of the o2o head is clearly visible in the detection count distribution: YOLOv10 end-to-end produces fewer boxes, consistent with its design.
+  \item \textbf{The compactness} of YOLOv10n is confirmed: 10\,\% fewer parameters and 23\,\% fewer FLOPs than YOLOv8n.
+\end{itemize}
+
+\subsection{What Does Not Work}
+
+\begin{itemize}[noitemsep]
+  \item \textbf{YOLOv10's accuracy advantage is not reproduced.} On COCO with 500 epochs, YOLOv10-N outperforms YOLOv8-N by 1.2 points. In our simplified setting, the reverse holds: YOLOv8n leads by 7.9 points. Several factors explain this gap.
+  \item \textbf{The latency advantage is not observed.} The paper reports a latency of 1.84~ms (T4 TensorRT) for YOLOv10-N vs.\ 6.16~ms for YOLOv8-N. On MPS, YOLOv10n is slower because CIB and PSA operators do not benefit from Apple backend optimizations.
+\end{itemize}
+
+\subsection{Factors Explaining the Differences with the Paper}
+
+\paragraph{Insufficient training duration.}
+With only 40 epochs and 10\,\% of the data, the model sees approximately $40 \times 1{,}640 = 65{,}600$ images in total, compared to $500 \times 118{,}000 = 59{,}000{,}000$ in the original paper --- a factor of $\sim$900$\times$. YOLOv10's architectural innovations (CIB, PSA, rank-guided design) likely require longer training to outperform the baseline.
+
+\paragraph{COCO pretraining.}
+Both models start from COCO-pretrained weights. This pretraining potentially advantages YOLOv8n because its C2f architecture is identical to the one used during pretraining, whereas YOLOv10n's CIB blocks constitute a different architecture requiring more adaptation.
+
+\paragraph{Reduced resolution.}
+At $416\!\times\!416$, YOLOv10n's PSA module operates on smaller feature maps, reducing the benefit of partial self-attention compared to the $640\!\times\!640$ resolution used in the paper.
+
+\paragraph{MPS backend.}
+The Apple MPS backend is not optimized for the \emph{depthwise} and partial attention operations used by YOLOv10, which nullifies the theoretical latency advantage.
+
+\subsection{Limitations of Our Work}
+
+\begin{itemize}[noitemsep]
+  \item Training on a reduced fraction of Pascal~VOC does not allow testing the hypothesis that YOLOv10 performs better at larger scale.
+  \item We could not reproduce latency measurements on a T4 GPU with TensorRT, which is the paper's reference setup.
+  \item The study is limited to Nano variants; conclusions may differ for larger models (S, M, B) where the paper shows clearer gains.
+  \item We did not explore the impact of the number of epochs on the relative convergence of the two models.
+\end{itemize}
+
+% ===========================================================================
+\section{Conclusion}
+% ===========================================================================
+
+This project reproduced the main contributions of YOLOv10 in a simplified setting. The end-to-end vs.\ NMS ablation confirms that the \emph{one-to-one} head effectively eliminates the need for post-processing, at the cost of a performance loss for small-capacity models --- an observation consistent with the original paper. The architectural compactness of YOLOv10n (fewer parameters and FLOPs) is verified, but does not translate into a latency advantage on the MPS backend.
+
+The overall performance gap in favor of YOLOv8n in our setting is primarily explained by the very limited training duration and small amount of data, which prevent YOLOv10's innovations from being fully expressed. Complementary experiments with more epochs, higher resolution, and an NVIDIA GPU would be natural next steps.
+
+% ===========================================================================
+% Bibliography
+% ===========================================================================
+\begin{thebibliography}{9}
+
+\bibitem{wang2024yolov10}
+A.~Wang, H.~Chen, L.~Liu, K.~Chen, Z.~Lin, J.~Han, G.~Ding.
+\newblock YOLOv10: Real-Time End-to-End Object Detection.
+\newblock In \emph{NeurIPS}, 2024.
+\newblock \href{https://arxiv.org/abs/2405.14458}{arXiv:2405.14458}.
+
+\bibitem{yolov8}
+G.~Jocher.
+\newblock YOLOv8.
+\newblock \url{https://github.com/ultralytics/ultralytics}, 2023.
+
+\bibitem{voc}
+M.~Everingham, L.~Van~Gool, C.~K.~I.~Williams, J.~Winn, A.~Zisserman.
+\newblock The Pascal Visual Object Classes (VOC) Challenge.
+\newblock \emph{IJCV}, 88(2):303--338, 2010.
+
+\bibitem{nms}
+J.~Hosang, R.~Benenson, B.~Schiele.
+\newblock Learning Non-Maximum Suppression.
+\newblock In \emph{CVPR}, 2017.
+
+\bibitem{detr}
+N.~Carion, F.~Massa, G.~Synnaeve, N.~Usunier, A.~Kirillov, S.~Zagoruyko.
+\newblock End-to-End Object Detection with Transformers.
+\newblock In \emph{ECCV}, 2020.
+
+\bibitem{cspnet}
+C.-Y.~Wang, H.-Y.~M.~Liao, Y.-H.~Wu, P.-Y.~Chen, J.-W.~Hsieh, I.-H.~Yeh.
+\newblock CSPNet: A New Backbone that can Enhance Learning Capability of CNN.
+\newblock In \emph{CVPR Workshops}, 2020.
+
+\bibitem{rtdetr}
+Y.~Lv, Y.~Xu, W.~Ye, W.~Zhao, J.~Wei, C.~Wang, J.~Dang, S.~Liu, B.~Cao.
+\newblock DETRs Beat YOLOs on Real-time Object Detection.
+\newblock In \emph{CVPR}, 2024.
+
+\end{thebibliography}
+
+\end{document}

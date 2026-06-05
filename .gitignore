@@ -16,7 +16,7 @@ venv/
 
 # Donnees et artefacts lourds
 data/
-results/
+
 
 # Poids et checkpoints telecharges localement
 *.pt

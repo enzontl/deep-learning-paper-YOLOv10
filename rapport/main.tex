@@ -122,7 +122,7 @@ Attention             & --- & Partial self-attention \\
 
 We use the \textbf{Pascal~VOC} dataset (20 object classes) via the \texttt{VOC.yaml} configuration provided by Ultralytics. To comply with hardware constraints, we use only \textbf{10\,\%} of the training data (\texttt{fraction=0.1}), i.e., approximately 1,640 images out of the 16,400 available. Evaluation is performed on the full VOC~2007 test set.
 
-Images are resized to $416\!\times\!416$ pixels (instead of $640\!\times\!640$ in the original paper) to speed up training. Standard augmentations are retained: mosaic, horizontal flip, HSV adjustments, and \texttt{erasing=0.4}.
+Images are resized to $640\!\times\!640$ pixels, matching the resolution used in the original paper. Standard augmentations are retained: mosaic, horizontal flip, HSV adjustments, and \texttt{erasing=0.4}.
 
 \subsection{Training Protocol}
 
@@ -136,10 +136,10 @@ Both models are trained with identical hyperparameters to ensure a fair comparis
 \toprule
 \textbf{Parameter} & \textbf{Value} \\
 \midrule
-Epochs               & 40 \\
+Epochs               & 100 \\
 Batch size           & 8 \\
-Image size           & $416\!\times\!416$ \\
-Optimizer            & SGD (lr$_0$=0.005, momentum=0.937) \\
+Image size           & $640\!\times\!640$ \\
+Optimizer            & SGD (lr$_0$=0.01, momentum=0.937) \\
 Scheduler            & Cosine annealing (lr$_f$=0.001) \\
 Weight decay         & $5\!\times\!10^{-4}$ \\
 Warmup               & 3 epochs \\
@@ -166,8 +166,7 @@ We report the standard object detection metrics:
 \begin{itemize}[noitemsep]
   \item \textbf{Dataset}: Pascal~VOC (20 classes, $\sim$1.6k training images) instead of COCO (80 classes, 118k images).
   \item \textbf{Fraction}: only 10\,\% of the training data.
-  \item \textbf{Resolution}: $416\!\times\!416$ instead of $640\!\times\!640$.
-  \item \textbf{Epochs}: 40 instead of 500.
+  \item \textbf{Epochs}: 100 instead of 500.
   \item \textbf{Scale}: only the \texttt{Nano} variants (lightest models).
   \item \textbf{Hardware}: Apple MPS instead of NVIDIA T4/A100 GPUs.
   \item \textbf{AMP}: disabled (MPS incompatibility at the time of experiments).
@@ -179,7 +178,7 @@ We report the standard object detection metrics:
 
 \subsection{Learning Curves}
 
-Figure~\ref{fig:learning_curves} shows the evolution of mAP@50:95 on the validation set throughout training. YOLOv8n converges faster and maintains a consistent advantage over YOLOv10n across all 40~epochs. From epoch~5 onward, the gap stabilizes at approximately 7--8 mAP@50:95 points.
+Figure~\ref{fig:learning_curves} shows the evolution of mAP@50:95 on the validation set throughout the 100~training epochs. YOLOv8n converges faster (especially during the first 20 epochs, where it is already $\sim$9 points ahead) and keeps a consistent advantage over YOLOv10n. From epoch~40 onward both curves flatten and the gap narrows to roughly 4--5 mAP@50:95 points; the closing of the \texttt{mosaic} augmentation in the last 10 epochs is visible as a slight plateau for both models.
 
 \begin{figure}[H]
   \centering
@@ -200,15 +199,15 @@ Table~\ref{tab:final_metrics} presents the evaluation results on the best checkp
 \toprule
 \textbf{Model} & \textbf{mAP@50} & \textbf{mAP@50:95} & \textbf{Precision} & \textbf{Recall} \\
 \midrule
-YOLOv10n (end-to-end) & 0.559 & 0.387 & 0.612 & 0.522 \\
-YOLOv8n (NMS)         & 0.680 & 0.466 & 0.725 & 0.621 \\
+YOLOv10n (end-to-end) & 0.606 & 0.403 & 0.665 & 0.566 \\
+YOLOv8n (NMS)         & 0.667 & 0.443 & 0.711 & 0.619 \\
 \midrule
-\textbf{Gap}          & \textbf{--0.121} & \textbf{--0.079} & \textbf{--0.113} & \textbf{--0.099} \\
+\textbf{Gap}          & \textbf{--0.061} & \textbf{--0.041} & \textbf{--0.046} & \textbf{--0.053} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-YOLOv8n outperforms YOLOv10n across all metrics. The 7.9-point gap in mAP@50:95 is significant and contrasts with the original paper's results, where YOLOv10-N surpasses YOLOv8-N by 1.2 points on COCO (38.5 vs.\ 37.3).
+YOLOv8n still outperforms YOLOv10n across all metrics, but the gap is markedly smaller than with the 40-epoch / 416~px setup: \mbox{--4.1} points in mAP@50:95 (vs.\ --7.9 previously). This remains in the opposite direction of the original paper, where YOLOv10-N surpasses YOLOv8-N by 1.2 points on COCO (38.5 vs.\ 37.3), but the trajectory clearly improves as training is given more iterations and a larger input resolution.
 
 \begin{figure}[H]
   \centering
@@ -229,13 +228,13 @@ Table~\ref{tab:efficiency} puts model size, local latency, and the paper's refer
 \toprule
 \textbf{Model} & \textbf{Params (M)} & \textbf{FLOPs (G)} & \textbf{mAP@50:95} & \textbf{Local latency (ms)} & \textbf{Checkpoint (MB)} \\
 \midrule
-YOLOv10n & 2.71 & 6.7 & 0.387 & 28.5 & 5.46 \\
-YOLOv8n  & 3.01 & 8.7 & 0.466 & 22.1 & 5.93 \\
+YOLOv10n & 2.71 & 6.7 & 0.403 & 21.2 & 5.48 \\
+YOLOv8n  & 3.01 & 8.7 & 0.443 & 19.0 & 5.95 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Despite having 10\,\% fewer parameters and 23\,\% fewer FLOPs, YOLOv10n is \emph{slower} locally (28.5~ms vs.\ 22.1~ms). This is because YOLOv10-specific operators (PSA, CIB) are not optimized for Apple's MPS backend, unlike the standard C2f operations in YOLOv8 which benefit from mature support.
+Despite having 10\,\% fewer parameters and 23\,\% fewer FLOPs, YOLOv10n remains \emph{slower} locally (21.2~ms vs.\ 19.0~ms, i.e.\ 47.2 vs.\ 52.6~FPS). This is because YOLOv10-specific operators (PSA, CIB) are not optimized for Apple's MPS backend, unlike the standard C2f operations in YOLOv8 which benefit from mature support.
 
 \begin{figure}[H]
   \centering
@@ -246,7 +245,7 @@ Despite having 10\,\% fewer parameters and 23\,\% fewer FLOPs, YOLOv10n is \emph
 
 \subsection{Per-Class Analysis}
 
-Figure~\ref{fig:per_class} details the mAP@50:95 for each of the 20 Pascal~VOC classes. The gap between the two models is \emph{systematic}: YOLOv8n dominates on every single class. The most affected classes are \texttt{bottle} ($\Delta$=--0.089), \texttt{cow} ($\Delta$=--0.119), and \texttt{tvmonitor} ($\Delta$=--0.083), while \texttt{car} and \texttt{cat} show the smallest gaps.
+Figure~\ref{fig:per_class} details the mAP@50:95 for each of the 20 Pascal~VOC classes. The gap between the two models remains systematic --- YOLOv8n is ahead on essentially every class --- but is now much narrower than in the 40-epoch setup. The most affected classes are \texttt{sheep} ($\Delta$=--0.113), \texttt{aeroplane} ($\Delta$=--0.080), \texttt{sofa} ($\Delta$=--0.065) and \texttt{tvmonitor} ($\Delta$=--0.059), while \texttt{horse}, \texttt{bird}, \texttt{dog} and \texttt{train} are essentially on par ($|\Delta| \leq 0.012$).
 
 \begin{figure}[H]
   \centering
@@ -295,9 +294,9 @@ We evaluate the \emph{same} YOLOv10n checkpoint (\texttt{best.pt}) under three c
 \toprule
 \textbf{Configuration} & \textbf{mAP@50} & \textbf{mAP@50:95} & \textbf{Precision} & \textbf{Recall} \\
 \midrule
-YOLOv10 end-to-end  & 0.559 & 0.387 & 0.612 & 0.522 \\
-YOLOv10 forced NMS  & 0.665 & 0.452 & 0.697 & 0.618 \\
-YOLOv8 (reference)  & 0.680 & 0.466 & 0.725 & 0.621 \\
+YOLOv10 end-to-end  & 0.606 & 0.403 & 0.665 & 0.566 \\
+YOLOv10 forced NMS  & 0.648 & 0.434 & 0.703 & 0.598 \\
+YOLOv8 (reference)  & 0.667 & 0.443 & 0.711 & 0.619 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -310,7 +309,7 @@ YOLOv8 (reference)  & 0.680 & 0.466 & 0.725 & 0.621 \\
 \end{figure}
 
 \paragraph{Analysis.}
-Forcing NMS on the YOLOv10n checkpoint recovers \textbf{6.5 mAP@50:95 points} (0.387 $\to$ 0.452), closing most of the gap with YOLOv8n (0.466). This demonstrates that:
+Forcing NMS on the YOLOv10n checkpoint recovers \textbf{3.1 mAP@50:95 points} (0.403 $\to$ 0.434), closing most of the gap with YOLOv8n (0.443). This demonstrates that:
 
 \begin{enumerate}[noitemsep]
   \item The backbone and neck of YOLOv10n have learned representations of comparable quality to those of YOLOv8n.
@@ -318,7 +317,7 @@ Forcing NMS on the YOLOv10n checkpoint recovers \textbf{6.5 mAP@50:95 points} (0
   \item This finding is \textbf{consistent with the original paper's analysis} (Section~5, Table~3), which acknowledges a 1.0\,\% AP gap for YOLOv10-N on COCO between end-to-end and NMS modes.
 \end{enumerate}
 
-The residual 1.4-point gap between YOLOv10 forced NMS and YOLOv8 can be explained by architectural differences (CIB vs.\ C2f) and the fact that our limited training conditions (40 epochs, 10\,\% of data) do not allow YOLOv10's innovations to fully compensate.
+The residual 0.9-point gap between YOLOv10 forced NMS and YOLOv8 is now small and can be explained by architectural differences (CIB vs.\ C2f) and the fact that our limited training conditions (100 epochs, 10\,\% of data) still do not allow YOLOv10's innovations to fully compensate.
 
 \subsection{Detection Count Distribution}
 
@@ -346,20 +345,17 @@ Figure~\ref{fig:detection_dist} confirms that end-to-end mode produces \emph{few
 \subsection{What Does Not Work}
 
 \begin{itemize}[noitemsep]
-  \item \textbf{YOLOv10's accuracy advantage is not reproduced.} On COCO with 500 epochs, YOLOv10-N outperforms YOLOv8-N by 1.2 points. In our simplified setting, the reverse holds: YOLOv8n leads by 7.9 points. Several factors explain this gap.
-  \item \textbf{The latency advantage is not observed.} The paper reports a latency of 1.84~ms (T4 TensorRT) for YOLOv10-N vs.\ 6.16~ms for YOLOv8-N. On MPS, YOLOv10n is slower because CIB and PSA operators do not benefit from Apple backend optimizations.
+  \item \textbf{YOLOv10's accuracy advantage is not reproduced.} On COCO with 500 epochs, YOLOv10-N outperforms YOLOv8-N by 1.2 points. In our simplified setting, the reverse still holds: YOLOv8n leads by 4.1 points in mAP@50:95 (down from 7.9 with the previous 40-epoch / 416~px setup). The remaining gap is plausibly closeable with even longer training.
+  \item \textbf{The latency advantage is not observed.} The paper reports a latency of 1.84~ms (T4 TensorRT) for YOLOv10-N vs.\ 6.16~ms for YOLOv8-N. On MPS, YOLOv10n is slower (21.2~ms vs.\ 19.0~ms) because CIB and PSA operators do not benefit from Apple backend optimizations.
 \end{itemize}
 
 \subsection{Factors Explaining the Differences with the Paper}
 
-\paragraph{Insufficient training duration.}
-With only 40 epochs and 10\,\% of the data, the model sees approximately $40 \times 1{,}640 = 65{,}600$ images in total, compared to $500 \times 118{,}000 = 59{,}000{,}000$ in the original paper --- a factor of $\sim$900$\times$. YOLOv10's architectural innovations (CIB, PSA, rank-guided design) likely require longer training to outperform the baseline.
+\paragraph{Still-insufficient training duration.}
+With 100 epochs and 10\,\% of the data, the model sees approximately $100 \times 1{,}640 = 164{,}000$ images in total, compared to $500 \times 118{,}000 = 59{,}000{,}000$ in the original paper --- a factor of $\sim$360$\times$. Going from 40 to 100 epochs already cut the gap with YOLOv8n almost in half (from 7.9 to 4.1 mAP@50:95 points), which suggests that YOLOv10's architectural innovations (CIB, PSA, rank-guided design) require even longer training and more data to outperform the baseline.
 
 \paragraph{COCO pretraining.}
 Both models start from COCO-pretrained weights. This pretraining potentially advantages YOLOv8n because its C2f architecture is identical to the one used during pretraining, whereas YOLOv10n's CIB blocks constitute a different architecture requiring more adaptation.
-
-\paragraph{Reduced resolution.}
-At $416\!\times\!416$, YOLOv10n's PSA module operates on smaller feature maps, reducing the benefit of partial self-attention compared to the $640\!\times\!640$ resolution used in the paper.
 
 \paragraph{MPS backend.}
 The Apple MPS backend is not optimized for the \emph{depthwise} and partial attention operations used by YOLOv10, which nullifies the theoretical latency advantage.
@@ -379,7 +375,7 @@ The Apple MPS backend is not optimized for the \emph{depthwise} and partial atte
 
 This project reproduced the main contributions of YOLOv10 in a simplified setting. The end-to-end vs.\ NMS ablation confirms that the \emph{one-to-one} head effectively eliminates the need for post-processing, at the cost of a performance loss for small-capacity models --- an observation consistent with the original paper. The architectural compactness of YOLOv10n (fewer parameters and FLOPs) is verified, but does not translate into a latency advantage on the MPS backend.
 
-The overall performance gap in favor of YOLOv8n in our setting is primarily explained by the very limited training duration and small amount of data, which prevent YOLOv10's innovations from being fully expressed. Complementary experiments with more epochs, higher resolution, and an NVIDIA GPU would be natural next steps.
+The overall performance gap in favor of YOLOv8n is primarily explained by the still-limited amount of data, which prevents YOLOv10's innovations from being fully expressed. Moving from 40 to 100 epochs at the paper's native $640\!\times\!640$ resolution shrinks the mAP@50:95 gap from 7.9 to 4.1 points and the residual NMS-vs.-end2end gap from 6.5 to 3.1 points, suggesting that longer training on the full dataset (and an NVIDIA GPU with TensorRT for latency) would be the natural next steps to fully reproduce the paper.
 
 % ===========================================================================
 % Bibliography

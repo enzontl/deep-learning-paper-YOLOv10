@@ -27,8 +27,8 @@ We keep **Pascal VOC** because it is the most relevant dataset in the allowed li
 To keep the project feasible locally, the setup uses:
 
 - a reduced training fraction
-- a memory-safe configuration for Apple Silicon
-- a moderate number of epochs
+- an MPS-friendly configuration for Apple Silicon
+- a longer training schedule
 
 ## Notebooks
 
@@ -42,17 +42,18 @@ The repository is organized around two notebooks:
 The training notebook:
 
 - uses `mps` when available
-- uses a conservative memory-safe setup
+- uses an MPS-friendly setup
 - trains `YOLOv10n` and `YOLOv8n`
 - stores `best.pt`, `last.pt`, and `results.csv`
 
 Current default training setup:
 
-- `imgsz = 384`
-- `batch = 4`
-- `epochs = 40`
+- `imgsz = 640`
+- `batch = 8`
+- `epochs = 100`
 - `fraction = 0.10`
 - `optimizer = SGD`
+- `cos_lr = True`
 - `device = mps`
 - `workers = 0`
 - `plots = False`
